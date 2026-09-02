@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<title>Mazo de cartas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Karla:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-0:#141019;
+    --bg-1:#1d1826;
+    --card-back:#241e33;
+    --card-back-line: rgba(212,162,78,0.35);
+    --parchment:#f3ead8;
+    --ink:#2a2036;
+    --gold:#d4a24e;
+    --plum:#6a3452;
+    --sage:#6f8a63;
+    --muted: rgba(243,234,216,0.55);
+  }
+
+  *{ box-sizing:border-box; }
+
+  html,body{
+    height:100%;
+    margin:0;
+    background: radial-gradient(ellipse at 50% 20%, var(--bg-1), var(--bg-0) 70%);
+    color: var(--parchment);
+    font-family: 'Karla', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+
+  .stage{
+    height:100%;
+    width:100%;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    padding: 24px;
+    position: relative;
+  }
+
+  .dots{
+    display:flex;
+    gap: 7px;
+    margin-bottom: 34px;
+  }
+  .dot{
+    width:7px; height:7px; border-radius:50%;
+    background: rgba(243,234,216,0.18);
+    transition: background 0.4s ease, transform 0.4s ease;
+  }
+  .dot.done{ background: var(--gold); }
+
+  .deck{
+    position: relative;
+    width: min(66vw, 250px);
+    height: min(66vw, 250px);
+    max-height: 46vh;
+    aspect-ratio: 5/7;
+  }
+
+  .card{
+    position:absolute;
+    inset:0;
+    border-radius: 18px;
+    cursor: pointer;
+    transform-style: preserve-3d;
+    transition: transform 0.6s cubic-bezier(.4,.1,.2,1), top 0.5s ease, left 0.5s ease, opacity 0.5s ease;
+  }
+
+  .card.leaving{
+    transform: translateY(-40px) rotate(-6deg) !important;
+    opacity: 0;
+  }
+
+  .card.flipped .card-inner{
+    transform: rotateY(180deg);
+  }
+
+  .card-inner{
+    position:relative;
+    width:100%;
+    height:100%;
+    transform-style: preserve-3d;
+    transition: transform 0.7s cubic-bezier(.4,.1,.2,1);
+  }
+
+  .face{
+    position:absolute;
+    inset:0;
+    border-radius: 18px;
+    backface-visibility: hidden;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    box-shadow: 0 18px 40px rgba(0,0,0,0.45);
+  }
+
+  .face-back{
+    background:
+      radial-gradient(circle at 50% 42%, rgba(212,162,78,0.10), transparent 60%),
+      var(--card-back);
+    border: 1px solid rgba(212,162,78,0.22);
+  }
+
+  .face-back svg{ width: 34%; opacity:0.55; }
+
+  .face-front{
+    background: var(--parchment);
+    color: var(--ink);
+    transform: rotateY(180deg);
+    flex-direction: column;
+    padding: 10% 8%;
+    border: 6px solid var(--gold);
+    text-align: center;
+  }
+
+  .face-front.tone-struggle{ border-color: var(--plum); }
+  .face-front.tone-truth{ border-color: var(--sage); }
+
+  .emoji{
+    font-size: clamp(2.4rem, 9vw, 3.4rem);
+    line-height: 1;
+    margin-bottom: 0.5em;
+  }
+
+  .word{
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: clamp(1.2rem, 5.2vw, 1.7rem);
+    letter-spacing: 0.01em;
+    line-height: 1.15;
+  }
+
+  .idle-pulse{
+    animation: pulse 3.2s ease-in-out infinite;
+  }
+  @keyframes pulse{
+    0%,100%{ box-shadow: 0 18px 40px rgba(0,0,0,0.45); }
+    50%{ box-shadow: 0 18px 55px rgba(212,162,78,0.18); }
+  }
+
+  .hint{
+    margin-top: 30px;
+    font-size: 0.85rem;
+    letter-spacing: 0.02em;
+    color: var(--muted);
+    min-height: 1.4em;
+    text-align: center;
+  }
+
+  .restart{
+    margin-top: 18px;
+    background: none;
+    border: 1px solid rgba(243,234,216,0.3);
+    color: var(--parchment);
+    font-family: 'Karla', sans-serif;
+    font-size: 0.85rem;
+    padding: 10px 22px;
+    border-radius: 999px;
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.4s ease, border-color 0.2s ease;
+  }
+  .restart.show{ opacity: 1; pointer-events: auto; }
+  .restart:hover{ border-color: var(--gold); }
+
+  @media (prefers-reduced-motion: reduce){
+    .card, .card-inner, .idle-pulse{ transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <div class="dots" id="dots"></div>
+
+  <div class="deck" id="deck"></div>
+
+  <div class="hint" id="hint">Toca la carta</div>
+  <button class="restart" id="restart">Barajar de nuevo</button>
+</div>
+
+<script>
+const CARDS = [
+  { emoji: "😔", word: "MIEDO", tone: "struggle" },
+  { emoji: "💔", word: "SOLEDAD", tone: "struggle" },
+  { emoji: "😣", word: "DESÁNIMO", tone: "struggle" },
+  { emoji: "🚪", word: "ESTANCAMIENTO", tone: "struggle" },
+  { emoji: "💸", word: "ESCASEZ", tone: "struggle" },
+  { emoji: "😟", word: "PREOCUPACIÓN", tone: "struggle" },
+  { emoji: "❤️", word: "AMOR", tone: "truth" },
+  { emoji: "🔥", word: "FE", tone: "truth" },
+  { emoji: "🌱", word: "CRECIMIENTO", tone: "truth" },
+  { emoji: "🏠", word: "FAMILIA", tone: "truth" },
+  { emoji: "🎯", word: "PROPÓSITO", tone: "truth" },
+  { emoji: "🙌", word: "BENDICIÓN", tone: "truth" },
+];
+
+const deckEl = document.getElementById('deck');
+const dotsEl = document.getElementById('dots');
+const hintEl = document.getElementById('hint');
+const restartEl = document.getElementById('restart');
+
+let order = [];
+let pos = 0;       // index into order, how many cards fully drawn/discarded
+let flipped = false;
+
+function shuffle(arr){
+  const a = arr.slice();
+  for(let i = a.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function backSVG(){
+  return `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    <path d="M50 10 L58 45 L90 50 L58 55 L50 90 L42 55 L10 50 L42 45 Z"
+      fill="none" stroke="#d4a24e" stroke-width="2"/>
+    <circle cx="50" cy="50" r="6" fill="#d4a24e" opacity="0.6"/>
+  </svg>`;
+}
+
+function buildDots(){
+  dotsEl.innerHTML = '';
+  for(let i = 0; i < CARDS.length; i++){
+    const d = document.createElement('div');
+    d.className = 'dot';
+    dotsEl.appendChild(d);
+  }
+}
+
+function updateDots(){
+  const dots = dotsEl.children;
+  for(let i = 0; i < dots.length; i++){
+    dots[i].classList.toggle('done', i < pos);
+  }
+}
+
+function init(){
+  order = shuffle(CARDS);
+  pos = 0;
+  flipped = false;
+  buildDots();
+  updateDots();
+  restartEl.classList.remove('show');
+  hintEl.textContent = 'Toca la carta';
+  renderDeck();
+}
+
+function renderDeck(){
+  deckEl.innerHTML = '';
+
+  if(pos >= order.length){
+    hintEl.textContent = 'Has visto las 12 cartas';
+    restartEl.classList.add('show');
+    return;
+  }
+
+  // render a few cards behind the top one for a stacked-deck look
+  const behindCount = Math.min(3, order.length - pos - 1);
+  for(let k = behindCount; k >= 1; k--){
+    const el = document.createElement('div');
+    el.className = 'card';
+    el.style.transform = `translateY(${k * 4}px) scale(${1 - k * 0.02})`;
+    el.style.zIndex = String(10 - k);
+    el.innerHTML = `<div class="card-inner">
+      <div class="face face-back">${backSVG()}</div>
+    </div>`;
+    deckEl.appendChild(el);
+  }
+
+  const top = order[pos];
+  const topEl = document.createElement('div');
+  topEl.className = 'card idle-pulse';
+  topEl.style.zIndex = '10';
+  topEl.innerHTML = `<div class="card-inner">
+    <div class="face face-back">${backSVG()}</div>
+    <div class="face face-front tone-${top.tone}">
+      <div class="emoji">${top.emoji}</div>
+      <div class="word">${top.word}</div>
+    </div>
+  </div>`;
+  deckEl.appendChild(topEl);
+
+  topEl.addEventListener('click', onTopClick);
+}
+
+function onTopClick(e){
+  const topEl = e.currentTarget;
+  topEl.classList.remove('idle-pulse');
+
+  if(!flipped){
+    flipped = true;
+    topEl.classList.add('flipped');
+    hintEl.textContent = 'Toca para la siguiente carta';
+    return;
+  }
+
+  // discard the flipped card, advance
+  topEl.classList.add('leaving');
+  topEl.removeEventListener('click', onTopClick);
+  pos += 1;
+  flipped = false;
+  updateDots();
+  hintEl.textContent = '';
+
+  setTimeout(() => {
+    renderDeck();
+    if(pos < order.length){
+      hintEl.textContent = 'Toca la carta';
+    }
+  }, 420);
+}
+
+restartEl.addEventListener('click', init);
+
+init();
+</script>
+
+</body>
+</html>
